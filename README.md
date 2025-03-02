@@ -7,7 +7,7 @@ A Laravel package to quickly generate DDD (Domain-Driven Design) structured doma
 You can install the package via composer:
 
 ```bash
-composer require laravelddd/domain
+composer require faguvenli/laravel-ddd-domain
 ```
 
 The package will automatically register its service provider.
