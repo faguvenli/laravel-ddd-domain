@@ -1,13 +1,14 @@
 {
     "name": "faguvenli/laravel-ddd-domain",
+    "version": "1.0.0",
     "description": "A Laravel package to create DDD structured domains",
     "keywords": ["laravel", "ddd", "domain-driven-design"],
     "type": "library",
     "license": "MIT",
     "authors": [
         {
-            "name": "Your Name",
-            "email": "your.email@example.com"
+            "name": "Fevzi Altay Güvenli",
+            "email": "faguvenli@gmail.com"
         }
     ],
     "require": {
@@ -39,6 +40,5 @@
     "config": {
         "sort-packages": true
     },
-    "minimum-stability": "dev",
-    "prefer-stable": true
+    "minimum-stability": "stable"
 }
