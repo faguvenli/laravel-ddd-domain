@@ -15,4 +15,15 @@ return [
         'domain' => 'src/Domain',
         'app' => 'src/app',
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | API Prefix
+    |--------------------------------------------------------------------------
+    |
+    | This value determines the prefix for API controllers and resources.
+    | Options might include 'Admin', 'Client', etc. Leave empty for no prefix.
+    |
+    */
+    'api_prefix' => '',
 ];

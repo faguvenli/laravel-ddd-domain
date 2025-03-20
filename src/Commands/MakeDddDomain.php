@@ -8,7 +8,7 @@ use Illuminate\Support\Str;
 
 class MakeDddDomain extends Command
 {
-    protected $signature = 'make:ddd-domain {name : The name of the domain}';
+    protected $signature = 'make:ddd-domain {name : The name of the domain} {--api-prefix= : Optional API prefix (Admin, Client, etc.)}';
     protected $description = 'Create a new DDD domain structure';
 
     public function handle()
@@ -19,29 +19,40 @@ class MakeDddDomain extends Command
         $studlyName = Str::studly($singularName);
         $camelName = Str::camel($singularName);
         $lowerName = Str::lower($singularName);
-
+        
+        // Get API prefix from option or config
+        $apiPrefix = $this->option('api-prefix') ?: config('laravelddd-domain.api_prefix', '');
+        $apiPrefix = $apiPrefix ? Str::studly($apiPrefix) : '';
+        
         $this->info("Creating DDD structure for {$studlyName} domain...");
+        
+        if ($apiPrefix) {
+            $this->info("Using API prefix: {$apiPrefix}");
+        }
 
         // Create domain directories
-        $this->createDirectories($studlyName);
+        $this->createDirectories($studlyName, $apiPrefix);
 
         // Create domain files
         $this->createDomainFiles($studlyName, $camelName);
 
         // Create API directories and files
-        $this->createApiFiles($studlyName, $camelName, $lowerName, $pluralName);
+        $this->createApiFiles($studlyName, $camelName, $lowerName, $pluralName, $apiPrefix);
 
         // Update routes file
-        $this->updateRoutesFile($studlyName, $lowerName, $pluralName);
+        $this->updateRoutesFile($studlyName, $lowerName, $pluralName, $apiPrefix);
 
         $this->info('DDD domain structure created successfully!');
         $this->info("Don't forget to run 'composer dump-autoload' to update autoloading.");
     }
 
-    protected function createDirectories($name)
+    protected function createDirectories($name, $apiPrefix = '')
     {
         $domainBasePath = config('laravelddd-domain.paths.domain', 'src/Domain');
         $appBasePath = config('laravelddd-domain.paths.app', 'src/app');
+        
+        // Build the API path with optional prefix
+        $apiPath = $apiPrefix ? "Api/{$apiPrefix}/{$name}" : "Api/{$name}";
         
         $directories = [
             // Domain directories
@@ -52,11 +63,11 @@ class MakeDddDomain extends Command
             "{$domainBasePath}/{$name}/QueryBuilders",
 
             // App directories
-            "{$appBasePath}/Api/{$name}/Controllers",
-            "{$appBasePath}/Api/{$name}/Factories",
-            "{$appBasePath}/Api/{$name}/Queries",
-            "{$appBasePath}/Api/{$name}/Requests",
-            "{$appBasePath}/Api/{$name}/Resources",
+            "{$appBasePath}/{$apiPath}/Controllers",
+            "{$appBasePath}/{$apiPath}/Factories",
+            "{$appBasePath}/{$apiPath}/Queries",
+            "{$appBasePath}/{$apiPath}/Requests",
+            "{$appBasePath}/{$apiPath}/Resources",
         ];
 
         foreach ($directories as $directory) {
@@ -101,48 +112,51 @@ class MakeDddDomain extends Command
         );
     }
 
-    protected function createApiFiles($name, $camelName, $lowerName, $pluralName)
+    protected function createApiFiles($name, $camelName, $lowerName, $pluralName, $apiPrefix = '')
     {
         $appBasePath = config('laravelddd-domain.paths.app', 'src/app');
         
+        // Build the API path with optional prefix
+        $apiPath = $apiPrefix ? "Api/{$apiPrefix}/{$name}" : "Api/{$name}";
+        
         // Create Controller
         $this->createFile(
-            "{$appBasePath}/Api/{$name}/Controllers/{$name}Controller.php",
-            $this->getControllerStub($name, $pluralName)
+            "{$appBasePath}/{$apiPath}/Controllers/{$name}Controller.php",
+            $this->getControllerStub($name, $pluralName, $apiPrefix)
         );
 
         // Create Requests
         $this->createFile(
-            "{$appBasePath}/Api/{$name}/Requests/{$name}CreateRequest.php",
-            $this->getCreateRequestStub($name, $lowerName)
+            "{$appBasePath}/{$apiPath}/Requests/{$name}CreateRequest.php",
+            $this->getCreateRequestStub($name, $lowerName, $apiPrefix)
         );
 
         $this->createFile(
-            "{$appBasePath}/Api/{$name}/Requests/{$name}UpdateRequest.php",
-            $this->getUpdateRequestStub($name, $lowerName)
+            "{$appBasePath}/{$apiPath}/Requests/{$name}UpdateRequest.php",
+            $this->getUpdateRequestStub($name, $lowerName, $apiPrefix)
         );
 
         // Create Factories
         $this->createFile(
-            "{$appBasePath}/Api/{$name}/Factories/{$name}CreateDataFactory.php",
-            $this->getCreateDataFactoryStub($name)
+            "{$appBasePath}/{$apiPath}/Factories/{$name}CreateDataFactory.php",
+            $this->getCreateDataFactoryStub($name, $apiPrefix)
         );
 
         $this->createFile(
-            "{$appBasePath}/Api/{$name}/Factories/{$name}UpdateDataFactory.php",
-            $this->getUpdateDataFactoryStub($name)
+            "{$appBasePath}/{$apiPath}/Factories/{$name}UpdateDataFactory.php",
+            $this->getUpdateDataFactoryStub($name, $apiPrefix)
         );
 
         // Create Resource
         $this->createFile(
-            "{$appBasePath}/Api/{$name}/Resources/{$name}Resource.php",
-            $this->getResourceStub($name)
+            "{$appBasePath}/{$apiPath}/Resources/{$name}Resource.php",
+            $this->getResourceStub($name, $apiPrefix)
         );
 
         // Create Query
         $this->createFile(
-            "{$appBasePath}/Api/{$name}/Queries/{$name}IndexQuery.php",
-            $this->getIndexQueryStub($name, $camelName)
+            "{$appBasePath}/{$apiPath}/Queries/{$name}IndexQuery.php",
+            $this->getIndexQueryStub($name, $camelName, $apiPrefix)
         );
     }
 
@@ -156,37 +170,42 @@ class MakeDddDomain extends Command
         }
     }
 
-    protected function updateRoutesFile($name, $lowerName, $pluralName)
+    protected function updateRoutesFile($name, $lowerName, $pluralName, $apiPrefix = '')
     {
         $apiRoutesPath = base_path('routes/api.php');
         $apiRoutes = File::get($apiRoutesPath);
 
+        // Build the namespace with optional prefix
+        $namespace = $apiPrefix ? "App\\Api\\{$apiPrefix}\\{$name}" : "App\\Api\\{$name}";
+        
         // Check if the controller import already exists
-        $controllerImport = "use App\\Api\\{$name}\\Controllers\\{$name}Controller;";
+        $controllerImport = "use {$namespace}\\Controllers\\{$name}Controller;";
         if (! Str::contains($apiRoutes, $controllerImport)) {
             // Add the controller import
             $apiRoutes = preg_replace(
                 '/use (.*);/',
-                "use App\\Api\\{$name}\\Controllers\\{$name}Controller;\nuse $1;",
+                "use {$namespace}\\Controllers\\{$name}Controller;\nuse $1;",
                 $apiRoutes,
                 1
             );
         }
 
-        // Check if the route registration already exists
-        $routeRegistration = "Route::apiResource('{$pluralName}', {$name}Controller::class);";
+        // Create route registration with optional prefix in the URI
+        $routePrefix = $apiPrefix ? Str::kebab($apiPrefix) . '/' : '';
+        $routeRegistration = "Route::apiResource('{$routePrefix}{$pluralName}', {$name}Controller::class);";
+        
         if (! Str::contains($apiRoutes, $routeRegistration)) {
             // Check if v1 group exists
             if (Str::contains($apiRoutes, "Route::prefix('v1')->group(function () {")) {
                 // Add to existing v1 group
                 $apiRoutes = preg_replace(
                     "/(Route::prefix\('v1'\)->group\(function \(\) \{\n[^}]*)(}\);)/s",
-                    "$1    Route::apiResource('{$pluralName}', {$name}Controller::class);\n$2",
+                    "$1    {$routeRegistration}\n$2",
                     $apiRoutes
                 );
             } else {
                 // Create new v1 group with the route registration
-                $apiRoutes .= "\nRoute::prefix('v1')->group(function () {\n    Route::apiResource('{$pluralName}', {$name}Controller::class);\n});\n";
+                $apiRoutes .= "\nRoute::prefix('v1')->group(function () {\n    {$routeRegistration}\n});\n";
             }
         }
 
@@ -311,18 +330,21 @@ class {$name}UpdateAction
 ";
     }
 
-    protected function getControllerStub($name, $pluralName)
+    protected function getControllerStub($name, $pluralName, $apiPrefix = '')
     {
+        // Build namespace with optional prefix
+        $namespace = $apiPrefix ? "App\\Api\\{$apiPrefix}\\{$name}" : "App\\Api\\{$name}";
+        
         return "<?php
 
-namespace App\\Api\\{$name}\\Controllers;
+namespace {$namespace}\\Controllers;
 
-use App\\Api\\{$name}\\Requests\\{$name}CreateRequest;
-use App\\Api\\{$name}\\Requests\\{$name}UpdateRequest;
-use App\\Api\\{$name}\\Resources\\{$name}Resource;
-use App\\Api\\{$name}\\Queries\\{$name}IndexQuery;
-use App\\Api\\{$name}\\Factories\\{$name}CreateDataFactory;
-use App\\Api\\{$name}\\Factories\\{$name}UpdateDataFactory;
+use {$namespace}\\Requests\\{$name}CreateRequest;
+use {$namespace}\\Requests\\{$name}UpdateRequest;
+use {$namespace}\\Resources\\{$name}Resource;
+use {$namespace}\\Queries\\{$name}IndexQuery;
+use {$namespace}\\Factories\\{$name}CreateDataFactory;
+use {$namespace}\\Factories\\{$name}UpdateDataFactory;
 use App\\Http\\Controllers\\Controller;
 use Domain\\{$name}\\Actions\\{$name}CreateAction;
 use Domain\\{$name}\\Actions\\{$name}UpdateAction;
@@ -377,11 +399,14 @@ class {$name}Controller extends Controller
 ";
     }
 
-    protected function getCreateRequestStub($name, $lowerName)
+    protected function getCreateRequestStub($name, $lowerName, $apiPrefix = '')
     {
+        // Build namespace with optional prefix
+        $namespace = $apiPrefix ? "App\\Api\\{$apiPrefix}\\{$name}" : "App\\Api\\{$name}";
+        
         return "<?php
 
-namespace App\\Api\\{$name}\\Requests;
+namespace {$namespace}\\Requests;
 
 use Illuminate\\Foundation\\Http\\FormRequest;
 
@@ -403,11 +428,14 @@ class {$name}CreateRequest extends FormRequest
 ";
     }
 
-    protected function getUpdateRequestStub($name, $lowerName)
+    protected function getUpdateRequestStub($name, $lowerName, $apiPrefix = '')
     {
+        // Build namespace with optional prefix
+        $namespace = $apiPrefix ? "App\\Api\\{$apiPrefix}\\{$name}" : "App\\Api\\{$name}";
+        
         return "<?php
 
-namespace App\\Api\\{$name}\\Requests;
+namespace {$namespace}\\Requests;
 
 use Illuminate\\Foundation\\Http\\FormRequest;
 
@@ -429,13 +457,16 @@ class {$name}UpdateRequest extends FormRequest
 ";
     }
 
-    protected function getCreateDataFactoryStub($name)
+    protected function getCreateDataFactoryStub($name, $apiPrefix = '')
     {
+        // Build namespace with optional prefix
+        $namespace = $apiPrefix ? "App\\Api\\{$apiPrefix}\\{$name}" : "App\\Api\\{$name}";
+        
         return "<?php
 
-namespace App\\Api\\{$name}\\Factories;
+namespace {$namespace}\\Factories;
 
-use App\\Api\\{$name}\\Requests\\{$name}CreateRequest;
+use {$namespace}\\Requests\\{$name}CreateRequest;
 use Domain\\{$name}\\DataTransferObjects\\{$name}Data;
 
 class {$name}CreateDataFactory
@@ -451,13 +482,16 @@ class {$name}CreateDataFactory
 ";
     }
 
-    protected function getUpdateDataFactoryStub($name)
+    protected function getUpdateDataFactoryStub($name, $apiPrefix = '')
     {
+        // Build namespace with optional prefix
+        $namespace = $apiPrefix ? "App\\Api\\{$apiPrefix}\\{$name}" : "App\\Api\\{$name}";
+        
         return "<?php
 
-namespace App\\Api\\{$name}\\Factories;
+namespace {$namespace}\\Factories;
 
-use App\\Api\\{$name}\\Requests\\{$name}UpdateRequest;
+use {$namespace}\\Requests\\{$name}UpdateRequest;
 use Domain\\{$name}\\DataTransferObjects\\{$name}Data;
 use Domain\\{$name}\\Models\\{$name};
 
@@ -477,11 +511,14 @@ class {$name}UpdateDataFactory
 ";
     }
 
-    protected function getResourceStub($name)
+    protected function getResourceStub($name, $apiPrefix = '')
     {
+        // Build namespace with optional prefix
+        $namespace = $apiPrefix ? "App\\Api\\{$apiPrefix}\\{$name}" : "App\\Api\\{$name}";
+        
         return "<?php
 
-namespace App\\Api\\{$name}\\Resources;
+namespace {$namespace}\\Resources;
 
 use Domain\\{$name}\\Models\\{$name};
 use Illuminate\\Http\\Request;
@@ -504,11 +541,14 @@ class {$name}Resource extends JsonResource
 ";
     }
 
-    protected function getIndexQueryStub($name, $camelName)
+    protected function getIndexQueryStub($name, $camelName, $apiPrefix = '')
     {
+        // Build namespace with optional prefix
+        $namespace = $apiPrefix ? "App\\Api\\{$apiPrefix}\\{$name}" : "App\\Api\\{$name}";
+        
         return "<?php
 
-namespace App\\Api\\{$name}\\Queries;
+namespace {$namespace}\\Queries;
 
 use Domain\\{$name}\\Models\\{$name};
 use Illuminate\\Database\\Eloquent\\Builder;
