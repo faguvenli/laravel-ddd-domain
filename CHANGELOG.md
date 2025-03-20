@@ -2,6 +2,12 @@
 
 All notable changes to `faguvenli/laravel-ddd-domain` will be documented in this file.
 
+## 1.1.0 - 2025-03-20
+
+- Added support for API prefixes (Admin, Client, etc.)
+- Added command option `--api-prefix` and config option `api_prefix`
+- Updated route generation to include API prefixes in URI
+
 ## 1.0.0 - 2025-03-03
 
 - Initial release

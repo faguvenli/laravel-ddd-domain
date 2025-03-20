@@ -40,28 +40,43 @@ return [
         'domain' => 'src/Domain',
         'app' => 'src/app',
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | API Prefix
+    |--------------------------------------------------------------------------
+    |
+    | This value determines the prefix for API controllers and resources.
+    | Options might include 'Admin', 'Client', etc. Leave empty for no prefix.
+    |
+    */
+    'api_prefix' => '',
 ];
 ```
 
-You can customize the base paths for your domain and application code as needed.
+You can customize the base paths for your domain and application code as needed. You can also set a default API prefix if you want all your domains to be placed under a specific prefix.
 
 ## Usage
 
 To create a new DDD domain structure, run:
 
 ```bash
-php artisan make:ddd-domain {name}
+php artisan make:ddd-domain {name} [--api-prefix=]
 ```
 
-Replace `{name}` with the name of your domain (singular form is recommended, but the command will handle pluralization as needed).
+Replace `{name}` with the name of your domain (singular form is recommended, but the command will handle pluralization as needed). You can optionally specify an API prefix using the `--api-prefix` option.
 
 For example:
 
 ```bash
+# Create a domain without API prefix
 php artisan make:ddd-domain Product
+
+# Create a domain with Admin API prefix
+php artisan make:ddd-domain Product --api-prefix=Admin
 ```
 
-This will create the following structure:
+This will create the following structure (example without API prefix):
 
 ```
 src/
@@ -92,6 +107,21 @@ src/
             │   └── ProductUpdateRequest.php
             └── Resources/
                 └── ProductResource.php
+```
+
+If you use an API prefix like `--api-prefix=Admin`, the application layer will be structured as:
+
+```
+src/
+└── app/
+    └── Api/
+        └── Admin/
+            └── Product/
+                ├── Controllers/
+                ├── Factories/
+                ├── Queries/
+                ├── Requests/
+                └── Resources/
 ```
 
 The command also updates your `routes/api.php` file to include routes for the new domain.
