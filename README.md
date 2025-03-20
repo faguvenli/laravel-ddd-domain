@@ -147,7 +147,7 @@ This package creates a DDD structure with the following components:
 ## Requirements
 
 - PHP 8.0 or higher
-- Laravel 8.0 or higher
+- Laravel 8.0, 9.0, 10.0, 11.0, or 12.0
 
 ## License
 
