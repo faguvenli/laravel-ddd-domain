@@ -2,6 +2,15 @@
 
 All notable changes to `faguvenli/laravel-ddd-domain` will be documented in this file.
 
+## 1.2.1 - 2025-03-21
+
+- Improved variable naming consistency throughout code
+- Fixed return types in Controller methods
+- Updated method parameters to use camelCase naming
+- Removed unnecessary imports for cleaner code
+- Fixed a syntax error in CreateAction
+- Removed redundant query property in IndexQuery
+
 ## 1.2.0 - 2025-03-21
 
 - Modernized code structure with improved patterns and syntax

@@ -103,12 +103,12 @@ class MakeDddDomain extends Command
         // Create Actions
         $this->createFile(
             "{$domainBasePath}/{$name}/Actions/{$name}CreateAction.php",
-            $this->getCreateActionStub($name)
+            $this->getCreateActionStub($name, $camelName)
         );
 
         $this->createFile(
             "{$domainBasePath}/{$name}/Actions/{$name}UpdateAction.php",
-            $this->getUpdateActionStub($name)
+            $this->getUpdateActionStub($name, $camelName)
         );
     }
 
@@ -276,7 +276,7 @@ class {$name}QueryBuilder extends Builder
 ";
     }
 
-    protected function getCreateActionStub($name)
+    protected function getCreateActionStub($name, $camelName)
     {
         return "<?php
 
@@ -287,20 +287,20 @@ use Domain\\{$name}\\Models\\{$name};
 
 class {$name}CreateAction
 {
-    public function __invoke({$name}Data \${$name}Data): {$name}
+    public function __invoke({$name}Data \${$camelName}Data): {$name}
     {
-        \${$name} = new {$name}();
+        \${$camelName} = new {$name}();
         // Map DTO properties to model attributes
-        // Example: \${$name}->name = \${$name}Data->name;
-        // \${$name}->save();
+        // Example: \${$camelName}->name = \${$camelName}Data->name;
+        // \${$camelName}->save();
 
-        return {$name};
+        return \${$camelName};
     }
 }
 ";
     }
 
-    protected function getUpdateActionStub($name)
+    protected function getUpdateActionStub($name, $camelName)
     {
         return "<?php
 
@@ -311,11 +311,11 @@ use Domain\\{$name}\\Models\\{$name};
 
 class {$name}UpdateAction
 {
-    public function __invoke({$name}Data \${$name}Data, {$name} \${$name}): {$name}
+    public function __invoke({$name}Data \${$camelName}Data, {$name} \${$camelName}): {$name}
     {
-        \${$name}->update((array) \${$name}Data);
+        \${$camelName}->update((array) \${$camelName}Data);
 
-        return \${$name}->refresh();
+        return \${$camelName}->refresh();
     }
 }
 ";
@@ -367,43 +367,43 @@ class {$name}Controller extends Controller
         {$name}CreateRequest \$request,
         {$name}CreateDataFactory \$factory,
         {$name}CreateAction \$action
-    ): {$name}Resource {
-        \${$name}Data = \$factory->fromRequest(\$request);
-        \${$name} = \$action(\${$name}Data);
+    ): JsonResponse {
+        \${$lowerName}Data = \$factory->fromRequest(\$request);
+        \${$lowerName} = \$action(\${$lowerName}Data);
 
         return ResponseBuilder::success(
-            new {$name}Resource(\${$name}),
+            new {$name}Resource(\${$lowerName}),
             __('api.common.responses.resource_created', ['resource' => __('api.app.{$lowerName}.title')])
         );
     }
 
     public function show(
-        {$name} \${$name}
+        {$name} \${$lowerName}
     ): JsonResponse {
         return ResponseBuilder::success(
-            new {$name}Resource(\${$name})
+            new {$name}Resource(\${$lowerName})
         );
     }
 
     public function update(
-        {$name} \${$name},
+        {$name} \${$lowerName},
         {$name}UpdateRequest \$request,
         {$name}UpdateDataFactory \$factory,
         {$name}UpdateAction \$action
     ): JsonResponse {
-        \${$name}Data = \$factory->fromRequest(\$request);
-        \${$name} = \$action(\${$name}Data, \${$name});
+        \${$lowerName}Data = \$factory->fromRequest(\$request);
+        \${$lowerName} = \$action(\${$lowerName}Data, \${$lowerName});
 
         return ResponseBuilder::success(
-            data: new {$name}Resource(\${$name}),
+            data: new {$name}Resource(\${$lowerName}),
             message: __('api.common.responses.resource_updated', ['resource' => __('api.app.{$lowerName}.title')])
         );
     }
 
     public function destroy(
-        {$name} \${$name}
+        {$name} \${$lowerName}
     ): JsonResponse {
-        \${$name}->delete();
+        \${$lowerName}->delete();
 
         return ResponseBuilder::success(
             message: __('api.common.responses.resource_deleted', ['resource' => __('api.app.{$lowerName}.title')]),
@@ -504,7 +504,6 @@ namespace {$namespace}\\Factories;
 
 use {$namespace}\\Requests\\{$name}UpdateRequest;
 use Domain\\{$name}\\DataTransferObjects\\{$name}Data;
-use Domain\\{$name}\\Models\\{$name};
 
 class {$name}UpdateDataFactory
 {
@@ -525,7 +524,6 @@ class {$name}UpdateDataFactory
 
 namespace {$namespace}\\Resources;
 
-use Domain\\{$name}\\Models\\{$name};
 use Illuminate\\Http\\Request;
 use Illuminate\\Http\\Resources\\Json\\JsonResource;
 
@@ -560,10 +558,9 @@ use Spatie\QueryBuilder\QueryBuilder;
 
 class {$name}IndexQuery extends QueryBuilder
 {
-    protected Builder \$query;
 
     public function __construct() {
-        parent::__construct(\$name::query());
+        parent::__construct({$name}::query());
 
         \$this
             ->allowedIncludes([
