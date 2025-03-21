@@ -19,13 +19,13 @@ class MakeDddDomain extends Command
         $studlyName = Str::studly($singularName);
         $camelName = Str::camel($singularName);
         $lowerName = Str::lower($singularName);
-        
+
         // Get API prefix from option or config
         $apiPrefix = $this->option('api-prefix') ?: config('laravelddd-domain.api_prefix', '');
         $apiPrefix = $apiPrefix ? Str::studly($apiPrefix) : '';
-        
+
         $this->info("Creating DDD structure for {$studlyName} domain...");
-        
+
         if ($apiPrefix) {
             $this->info("Using API prefix: {$apiPrefix}");
         }
@@ -50,10 +50,10 @@ class MakeDddDomain extends Command
     {
         $domainBasePath = config('laravelddd-domain.paths.domain', 'src/Domain');
         $appBasePath = config('laravelddd-domain.paths.app', 'src/app');
-        
+
         // Build the API path with optional prefix
         $apiPath = $apiPrefix ? "Api/{$apiPrefix}/{$name}" : "Api/{$name}";
-        
+
         $directories = [
             // Domain directories
             "{$domainBasePath}/{$name}/Actions",
@@ -81,7 +81,7 @@ class MakeDddDomain extends Command
     protected function createDomainFiles($name, $camelName)
     {
         $domainBasePath = config('laravelddd-domain.paths.domain', 'src/Domain');
-        
+
         // Create Model
         $this->createFile(
             "{$domainBasePath}/{$name}/Models/{$name}.php",
@@ -115,14 +115,14 @@ class MakeDddDomain extends Command
     protected function createApiFiles($name, $camelName, $lowerName, $pluralName, $apiPrefix = '')
     {
         $appBasePath = config('laravelddd-domain.paths.app', 'src/app');
-        
+
         // Build the API path with optional prefix
         $apiPath = $apiPrefix ? "Api/{$apiPrefix}/{$name}" : "Api/{$name}";
-        
+
         // Create Controller
         $this->createFile(
             "{$appBasePath}/{$apiPath}/Controllers/{$name}Controller.php",
-            $this->getControllerStub($name, $pluralName, $apiPrefix)
+            $this->getControllerStub($name, $pluralName, $lowerName, $apiPrefix)
         );
 
         // Create Requests
@@ -177,7 +177,7 @@ class MakeDddDomain extends Command
 
         // Build the namespace with optional prefix
         $namespace = $apiPrefix ? "App\\Api\\{$apiPrefix}\\{$name}" : "App\\Api\\{$name}";
-        
+
         // Check if the controller import already exists
         $controllerImport = "use {$namespace}\\Controllers\\{$name}Controller;";
         if (! Str::contains($apiRoutes, $controllerImport)) {
@@ -193,7 +193,7 @@ class MakeDddDomain extends Command
         // Create route registration with optional prefix in the URI
         $routePrefix = $apiPrefix ? Str::kebab($apiPrefix) . '/' : '';
         $routeRegistration = "Route::apiResource('{$routePrefix}{$pluralName}', {$name}Controller::class);";
-        
+
         if (! Str::contains($apiRoutes, $routeRegistration)) {
             // Check if v1 group exists
             if (Str::contains($apiRoutes, "Route::prefix('v1')->group(function () {")) {
@@ -252,14 +252,6 @@ class {$name}Data
         // Example: public readonly string \$name
     ) {
     }
-
-    public static function fromArray(array \$data): self
-    {
-        return new self(
-            // Map array keys to constructor parameters
-            // Example: name: \$data['name']
-        );
-    }
 }
 ";
     }
@@ -295,12 +287,14 @@ use Domain\\{$name}\\Models\\{$name};
 
 class {$name}CreateAction
 {
-    public function execute({$name}Data \${$name}Data): {$name}
+    public function __invoke({$name}Data \${$name}Data): {$name}
     {
-        return {$name}::create([
-            // Map DTO properties to model attributes
-            // Example: 'name' => \${$name}Data->name
-        ]);
+        \${$name} = new {$name}();
+        // Map DTO properties to model attributes
+        // Example: \${$name}->name = \${$name}Data->name;
+        // \${$name}->save();
+
+        return {$name};
     }
 }
 ";
@@ -317,12 +311,9 @@ use Domain\\{$name}\\Models\\{$name};
 
 class {$name}UpdateAction
 {
-    public function execute({$name} \${$name}, {$name}Data \${$name}Data): {$name}
+    public function __invoke({$name}Data \${$name}Data, {$name} \${$name}): {$name}
     {
-        \${$name}->update([
-            // Map DTO properties to model attributes
-            // Example: 'name' => \${$name}Data->name
-        ]);
+        \${$name}->update((array) \${$name}Data);
 
         return \${$name}->refresh();
     }
@@ -330,11 +321,11 @@ class {$name}UpdateAction
 ";
     }
 
-    protected function getControllerStub($name, $pluralName, $apiPrefix = '')
+    protected function getControllerStub($name, $pluralName, $lowerName, $apiPrefix = '')
     {
         // Build namespace with optional prefix
         $namespace = $apiPrefix ? "App\\Api\\{$apiPrefix}\\{$name}" : "App\\Api\\{$name}";
-        
+
         return "<?php
 
 namespace {$namespace}\\Controllers;
@@ -345,20 +336,31 @@ use {$namespace}\\Resources\\{$name}Resource;
 use {$namespace}\\Queries\\{$name}IndexQuery;
 use {$namespace}\\Factories\\{$name}CreateDataFactory;
 use {$namespace}\\Factories\\{$name}UpdateDataFactory;
-use App\\Http\\Controllers\\Controller;
+use App\\Api\\Controller;
 use Domain\\{$name}\\Actions\\{$name}CreateAction;
 use Domain\\{$name}\\Actions\\{$name}UpdateAction;
 use Domain\\{$name}\\Models\\{$name};
 use Illuminate\\Http\\JsonResponse;
-use Illuminate\\Http\\Resources\\Json\\AnonymousResourceCollection;
+use Support\Helpers\PaginateCollection;
+use Support\Helpers\ResponseBuilder;
 
 class {$name}Controller extends Controller
 {
-    public function index({$name}IndexQuery \$query): AnonymousResourceCollection
-    {
-        \${$pluralName} = \$query->paginate();
+    public function __construct() {
+        // define your permission middleware here
+    }
 
-        return {$name}Resource::collection(\${$pluralName});
+    public function index(
+        {$name}IndexQuery \$query
+    ): JsonResponse
+    {
+        return ResponseBuilder::success(
+            PaginateCollection::paginate(
+                {$name}Resource::collection(
+                    \$query->paginate(config('app.per_page'))
+                )
+            )
+        );
     }
 
     public function store(
@@ -366,15 +368,21 @@ class {$name}Controller extends Controller
         {$name}CreateDataFactory \$factory,
         {$name}CreateAction \$action
     ): {$name}Resource {
-        \${$name}Data = \$factory->create(\$request);
-        \${$name} = \$action->execute(\${$name}Data);
+        \${$name}Data = \$factory->fromRequest(\$request);
+        \${$name} = \$action(\${$name}Data);
 
-        return {$name}Resource::make(\${$name});
+        return ResponseBuilder::success(
+            new {$name}Resource(\${$name}),
+            __('api.common.responses.resource_created', ['resource' => __('api.app.{$lowerName}.title')])
+        );
     }
 
-    public function show({$name} \${$name}): {$name}Resource
-    {
-        return {$name}Resource::make(\${$name});
+    public function show(
+        {$name} \${$name}
+    ): JsonResponse {
+        return ResponseBuilder::success(
+            new {$name}Resource(\${$name})
+        );
     }
 
     public function update(
@@ -382,18 +390,24 @@ class {$name}Controller extends Controller
         {$name}UpdateRequest \$request,
         {$name}UpdateDataFactory \$factory,
         {$name}UpdateAction \$action
-    ): {$name}Resource {
-        \${$name}Data = \$factory->create(\$request);
-        \${$name} = \$action->execute(\${$name}, \${$name}Data);
+    ): JsonResponse {
+        \${$name}Data = \$factory->fromRequest(\$request);
+        \${$name} = \$action(\${$name}Data, \${$name});
 
-        return {$name}Resource::make(\${$name});
+        return ResponseBuilder::success(
+            data: new {$name}Resource(\${$name}),
+            message: __('api.common.responses.resource_updated', ['resource' => __('api.app.{$lowerName}.title')])
+        );
     }
 
-    public function destroy({$name} \${$name}): JsonResponse
-    {
+    public function destroy(
+        {$name} \${$name}
+    ): JsonResponse {
         \${$name}->delete();
 
-        return response()->json(['message' => '{$name} deleted successfully']);
+        return ResponseBuilder::success(
+            message: __('api.common.responses.resource_deleted', ['resource' => __('api.app.{$lowerName}.title')]),
+        );
     }
 }
 ";
@@ -403,7 +417,7 @@ class {$name}Controller extends Controller
     {
         // Build namespace with optional prefix
         $namespace = $apiPrefix ? "App\\Api\\{$apiPrefix}\\{$name}" : "App\\Api\\{$name}";
-        
+
         return "<?php
 
 namespace {$namespace}\\Requests;
@@ -432,7 +446,7 @@ class {$name}CreateRequest extends FormRequest
     {
         // Build namespace with optional prefix
         $namespace = $apiPrefix ? "App\\Api\\{$apiPrefix}\\{$name}" : "App\\Api\\{$name}";
-        
+
         return "<?php
 
 namespace {$namespace}\\Requests;
@@ -461,7 +475,7 @@ class {$name}UpdateRequest extends FormRequest
     {
         // Build namespace with optional prefix
         $namespace = $apiPrefix ? "App\\Api\\{$apiPrefix}\\{$name}" : "App\\Api\\{$name}";
-        
+
         return "<?php
 
 namespace {$namespace}\\Factories;
@@ -471,12 +485,9 @@ use Domain\\{$name}\\DataTransferObjects\\{$name}Data;
 
 class {$name}CreateDataFactory
 {
-    public function create({$name}CreateRequest \$request): {$name}Data
+    public function fromRequest({$name}CreateRequest \$request): {$name}Data
     {
-        return {$name}Data::fromArray([
-            // Map request data to DTO properties
-            // Example: 'name' => \$request->name
-        ]);
+        return new {$name}Data(...\$request->validated());
     }
 }
 ";
@@ -486,7 +497,7 @@ class {$name}CreateDataFactory
     {
         // Build namespace with optional prefix
         $namespace = $apiPrefix ? "App\\Api\\{$apiPrefix}\\{$name}" : "App\\Api\\{$name}";
-        
+
         return "<?php
 
 namespace {$namespace}\\Factories;
@@ -497,15 +508,9 @@ use Domain\\{$name}\\Models\\{$name};
 
 class {$name}UpdateDataFactory
 {
-    public function create({$name}UpdateRequest \$request): {$name}Data
+    public function fromRequest({$name}UpdateRequest \$request): {$name}Data
     {
-        /** @var {$name} \${$name} */
-        \${$name} = \$request->{$name};
-
-        return {$name}Data::fromArray([
-            // Map request data to DTO properties with fallback to existing values
-            // Example: 'name' => \$request->name ?? \${$name}->name
-        ]);
+        return new {$name}Data(...\$request->validated());
     }
 }
 ";
@@ -515,7 +520,7 @@ class {$name}UpdateDataFactory
     {
         // Build namespace with optional prefix
         $namespace = $apiPrefix ? "App\\Api\\{$apiPrefix}\\{$name}" : "App\\Api\\{$name}";
-        
+
         return "<?php
 
 namespace {$namespace}\\Resources;
@@ -528,7 +533,6 @@ class {$name}Resource extends JsonResource
 {
     public function toArray(Request \$request): array
     {
-        /** @var {$name} \$this */
         return [
             'id' => \$this->id,
             // Map model attributes to resource fields
@@ -545,50 +549,29 @@ class {$name}Resource extends JsonResource
     {
         // Build namespace with optional prefix
         $namespace = $apiPrefix ? "App\\Api\\{$apiPrefix}\\{$name}" : "App\\Api\\{$name}";
-        
+
         return "<?php
 
 namespace {$namespace}\\Queries;
 
 use Domain\\{$name}\\Models\\{$name};
-use Illuminate\\Database\\Eloquent\\Builder;
-use Illuminate\\Http\\Request;
-use Illuminate\\Pagination\\LengthAwarePaginator;
+use Spatie\QueryBuilder\AllowedFilter;
+use Spatie\QueryBuilder\QueryBuilder;
 
-class {$name}IndexQuery
+class {$name}IndexQuery extends QueryBuilder
 {
     protected Builder \$query;
 
-    public function __construct(
-        protected Request \$request
-    ) {
-        \$this->query = {$name}::query();
-        \$this->applyFilters();
-        \$this->applySorting();
-    }
+    public function __construct() {
+        parent::__construct(\$name::query());
 
-    protected function applyFilters(): void
-    {
-        // Apply filters based on request parameters
-        // Example:
-        // if (\$this->request->has('is_active')) {
-        //     \$this->query->whereActive(\$this->request->boolean('is_active'));
-        // }
-    }
-
-    protected function applySorting(): void
-    {
-        \$sortBy = \$this->request->get('sort_by', 'created_at');
-        \$sortDirection = \$this->request->get('sort_direction', 'desc');
-
-        \$this->query->orderBy(\$sortBy, \$sortDirection);
-    }
-
-    public function paginate(int \$perPage = 15): LengthAwarePaginator
-    {
-        \$perPage = \$this->request->get('per_page', \$perPage);
-
-        return \$this->query->paginate(\$perPage);
+        \$this
+            ->allowedIncludes([
+            ])
+            ->allowedFilters([
+            ])
+            ->allowedSorts([
+            ]);
     }
 }
 ";
