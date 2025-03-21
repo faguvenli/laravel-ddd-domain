@@ -2,6 +2,15 @@
 
 All notable changes to `faguvenli/laravel-ddd-domain` will be documented in this file.
 
+## 1.2.0 - 2025-03-21
+
+- Modernized code structure with improved patterns and syntax
+- Replaced `execute()` methods with `__invoke()` for Actions
+- Simplified DTO structure with modern PHP features
+- Added integration with Spatie's QueryBuilder package
+- Updated controllers to use consistent response patterns
+- Improved type-hinting and method signatures
+
 ## 1.1.0 - 2025-03-20
 
 - Added support for API prefixes (Admin, Client, etc.)
